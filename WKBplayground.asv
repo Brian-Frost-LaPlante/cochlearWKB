@@ -1,0 +1,281 @@
+%% Wavenumber-finding algorithms
+% In a 2-D model, k must satisfy k*tanh(kh) = -2*rho*j*omega*Y
+% The complex function f(k) = k*tanh(kh) + 2*rho*j*omega*Y has inf roots
+% Need the root in the 4th quadrant with the smallest imaginary part
+% Here are the parameters we will use, from Viergever p120:
+
+rho = 1e-6; h = 1; L = 35; % density, height, length
+
+M0 = 1.5e-6; R0 = 2e-3; S0 = 10e3; % value at base
+
+M1 = 0; R1 = 0; S1 = -0.2;% exponential constants, e.g. S = S0 e^(S1 x)
+
+X = 5000;
+x = linspace(0,L,X);
+
+M = M0*exp(M1*x); R = R0*exp(R1*x); S = S0*exp(S1*x); % spatial maps
+
+F = 500;
+freq = linspace(1000,10000,F); % frequency in Hz
+omega = 2*pi*freq; % radian frequency
+
+Z = (S./(1j*omega.')) + R + M.*(1j*omega.'); % F x X array, OC impedance
+Y = 1./Z; % F x X, OC admittance
+%% 1-D k approximation
+
+[k_1D_0, P_1D_0, V_1D_0] = WKB_1D(x,omega,Z,rho,h,0);
+[k_1D_1, P_1D_1, V_1D_1] = WKB_1D(x,omega,Z,rho,h,1);
+[k_1D_2, P_1D_2, V_1D_2] = WKB_1D(x,omega,Z,rho,h,2);
+%%
+figure
+subplot(2,4,1)
+semilogy(x,10*log10(abs(V_1D_0(1,:))),x,10*log10(abs(V_1D_1(1,:))),...
+    x,10*log10(abs(V_1D_2(1,:))))
+hold on
+pl(x,10*log10(abs(V_1D_0(1,:))),x,10*log10(abs(V_1D_1(1,:))),...
+    x,10*log10(abs(V_1D_2(1,:))))
+%ylim([1,50000])
+xlabel("x (mm)")
+ylabel("Velocity (unscaled)")
+legend("0-order, 2 kHz","1-order, 2 kHz","2-order, 2 kHz",...
+    "0-order, 6kHz","1-order, 6kHz","2-order, 6kHz","location",'nw')
+title("Cochlear Partition Velocity 1-D WKB Model)")
+
+subplot(2,1,2)
+plot(x,unwrap(angle(V_1D_0(1,:))),x,unwrap(angle(V_1D_1(1,:))),x,unwrap(angle(V_1D_2(1,:))))
+hold on
+plot(x,unwrap(angle(V_1D_0(F/2,:))),x,unwrap(angle(V_1D_1(F/2,:))),x,unwrap(angle(V_1D_2(F/2,:))))
+ylim([-pi*8,pi])
+%% 2-D long-wave k approximation 1st order
+k_2Dlw = sqrt(-1j*2*omega.'*rho.*Y);
+
+int_k_2Dlw = cumtrapz(k_2Dlw,2)*L/X;
+P_2Dlw =  exp(-1j*int_k_2Dlw).*sqrt(k_2Dlw(:,1)./k_2Dlw);
+V_2Dlw = P_2Dlw.*Y;
+
+
+figure
+subplot(2,1,1)
+semilogy(x,abs(V_2Dlw(1,:)),x,abs(V_2Dlw(1,:)))
+
+xlabel("x (mm)")
+ylabel("Velocity (unscaled)")
+%legend("5kHz","8kHz","location",'nw')
+title("Cochlear Partition Velocity 2-D WKB Model (Long-Wave Limit)")
+ylim([0.01,200])
+
+subplot(2,1,2)
+plot(x,unwrap(angle(V_2Dlw(1,:))),x,unwrap(angle(V_2Dlw(1,:))),x,unwrap(angle(V_2Dlw(1,:))))
+ylim([-pi*14,pi])
+
+%% 2-D short-wave
+k_2Dsw = -2*1j*omega.'*rho./Z;
+
+int_k_2Dsw = cumtrapz(k_2Dsw,2)*L/X;
+
+k0 = k_2Dsw(:,1);
+
+Asw = (k0*h./tanh(k0*h)).* ...
+    sqrt((k0*h.*sech(k0*h).^2 + tanh(k0*h))./...
+    (k_2Dsw*h.*sech(k_2Dsw*h).^2 + tanh(k_2Dsw*h)));
+
+P_2Dsw =  exp(-1j*int_k_2Dsw).*Asw;
+V_2Dsw = P_2Dsw.*Y;
+
+figure
+subplot(2,1,1)
+semilogy(x,abs(V_2Dsw(1,:)),x,abs(V_2Dsw(1,:)))
+
+xlabel("x (mm)")
+ylabel("Velocity (unscaled)")
+%legend("5kHz","8kHz","location",'nw')
+title("Cochlear Partition Velocity 2-D WKB Model (Short-Wave Limit)")
+ylim([0.01,200])
+
+subplot(2,1,2)
+plot(x,unwrap(angle(V_2Dsw(1,:))),x,unwrap(angle(V_2Dsw(1,:))),x,unwrap(angle(V_2Dsw(1,:))))
+ylim([-pi*14,pi])
+%% Iterative Solution via Viergever's method
+% C = -2*1j*omega.'*rho.*Y; % RHS of k relation, so ktanh(kh) - C = 0
+% 
+% k = nan(F,X);
+% 
+% kx = k_2Dlw(:,1); % this is k at x = 0, where long-wave holds well;
+% 
+% N = 10;
+% for i = 1:X
+%     wr = sqrt(S(i)/M(i));
+%     for ff = 1:F
+%         startingSW = true;
+%         if omega(ff)<(wr-50)
+%             for n = 1:N
+%                 f = kx(ff).*tanh(kx(ff)*h) - C(ff,i);
+%                 df = tanh(kx(ff)*h) + kx(ff)*h.*sech(kx(ff)*h).^2; % the derivative in k
+%                 kx(ff) = kx(ff) - f./df; % the Newton-Raphson update
+%             end
+%             k(ff,i) = kx(ff);
+%             FF = ff;
+%         elseif omega(ff)<(wr+500)
+%             k(ff,i) = k(FF,i);
+%             % near resonant frequency, we are screwed so we assume
+%             % continuity
+%         else 
+%             if startingSW % use the resonant estimate of the root
+%                 gamma = R(i)./(2*rho*h*omega(ff).');
+%                 ky = (pi/2)*gamma/h - 1j*(pi/2)*(1-gamma^2)/h;
+%                 startingSW = false;
+%             end
+%             for n = 1:N
+%                 f = ky.*tanh(ky*h) - C(ff,i);
+%                 df = tanh(ky*h) + ky*h.*sech(ky*h).^2; % the derivative in k
+%                 ky = ky - f./df; % the Newton-Raphson update
+%             end
+%             k(ff,i) = ky;
+%         end
+%     end
+%     startingSW = true;
+% end
+
+%% Iterative Solution via Viergever's method
+C = -2*1j*omega.'*rho.*Y; % RHS of k relation, so ktanh(kh) - C = 0
+
+k = nan(F,X);
+
+kx = k_2Dlw(:,1); % this is k at x = 0, where long-wave holds well;
+epsilon = 1;
+
+N = 10;
+for i = 1:X
+    startingSW = false;
+    for ff = 1:F
+        if ~startingSW
+            for n = 1:N
+                f = kx(ff).*tanh(kx(ff)*h) - C(ff,i);
+                df = tanh(kx(ff)*h) + kx(ff)*h.*sech(kx(ff)*h).^2; % the derivative in k
+                kx(ff) = kx(ff) - f./df; % the Newton-Raphson update
+                kx(ff) = abs(real(kx(ff))) -1j*abs(imag(kx(ff)));
+            end
+            if abs(f) <= epsilon || isnan(f)
+                k(ff,i) = kx(ff);
+            else
+
+                startingSW = true;
+                gamma = R(i)./(2*rho*h*omega(ff).');
+                ky = (pi/2)*gamma/h - 1j*(pi/2)*(1-gamma^2)/h;
+            end
+        end
+        
+        if startingSW   
+            f = ky.*tanh(ky*h) - C(ff,i);
+            df = tanh(ky*h) + ky*h.*sech(ky*h).^2; % the derivative in k
+            ky = ky - f./df; % the Newton-Raphson update
+            ky = abs(real(ky)) -1j*abs(imag(ky));
+            if abs(f) <= epsilon || isnan(f)
+                k(ff,i) = ky;
+            else
+                gamma = R(i)./(2*rho*h*omega(ff).');
+                ky = (pi/2)*gamma/h - 1j*(pi/2)*(1-gamma^2)/h;
+            end
+        end
+
+    end
+end
+   
+kk = k;
+kk = abs(real(kk))-1j*abs(imag(kk));
+kk_to_int = kk;
+kk_to_int(isnan(kk))=0;
+
+int_kk = cumtrapz(kk_to_int,2)*L/X;
+
+
+k0 = kk(:,1);
+
+A = (k0*h./tanh(k0*h)).* ...
+    sqrt((k0*h.*sech(k0*h).^2 + tanh(k0*h))./...
+    (kk*h.*sech(kk*h).^2 + tanh(kk*h)));
+
+P_NR =  exp(-1j*int_kk).*A;
+V_NR = P_NR.*Y;
+%% Iterative solution using Alessandro's method
+ka=sqrt(k_2Dlw); % F x D x 2 start iteration with this solotion;
+
+for step = 1:10
+    alpha_WKB=((ka).*h)./tanh(ka.*h);
+    ka=sqrt((k_2Dlw).*alpha_WKB);
+    ka=abs(real(ka))+1j.*(imag(ka));%force to pick solution of wave going from base to apex;
+end
+
+k0 = ka(:,1);
+
+int_ka = cumtrapz(ka,2)*L/X;
+
+Aa = sqrt(k0./ka);%(k0*h./tanh(k0*h)).* ...
+    sqrt((k0*h.*sech(k0*h).^2 + tanh(k0*h))./...
+    (ka*h.*sech(ka*h).^2 + tanh(ka*h)));
+
+P_a =  exp(-1j*int_ka).*Aa;
+V_a = P_a.*Y;
+
+%% Plots
+
+close all
+figure
+subplot(2,1,1)
+loglog(freq/1000,abs(V_NR(:,X/2)),freq/1000,abs(V_NR(:,X/4)),...
+    "LineWidth",2)
+hold on
+loglog(freq/1000,abs(V_2Dlw(:,X/2)),freq/1000,abs(V_2Dlw(:,X/4)), ...
+    "LineStyle","--","Color",'r')
+loglog(freq/1000,abs(V_2Dsw(:,X/2)),freq/1000,abs(V_2Dsw(:,X/4)),...
+    "LineStyle","--","Color",'k')
+loglog(freq/1000,abs(V_a(:,X/2)),freq/1000,abs(V_a(:,X/4)),...
+    "LineStyle","--","Color",'g')
+
+xlabel("Frequency (kHz)")
+ylabel("Velocity (unscaled)")
+legend("Apex NR","Base NR","Apex LW","Base LW","Apex SW","Base SW",...
+    "Apex A","Base A","location",'nw')
+title("Cochlear Partition Velocity 2-D WKB Model (Newton-Raphson)")
+
+ylim([0.001,2000])
+subplot(2,1,2)
+semilogx(freq/1000,unwrap(angle(V_NR(:,X/2))),freq/1000,...
+    unwrap(angle(V_NR(:,X/4))),"LineWidth",2)
+hold on
+semilogx(freq/1000,unwrap(angle(V_2Dlw(:,X/2))),freq/1000,...
+    unwrap(angle(V_2Dlw(:,X/4))),"LineStyle","--","Color",'k')
+semilogx(freq/1000,unwrap(angle(V_2Dsw(:,X/2))),freq/1000,...
+    unwrap(angle(V_2Dsw(:,X/4))),"LineStyle","--","Color",'k')
+semilogx(freq/1000,unwrap(angle(V_a(:,X/2))),freq/1000,...
+    unwrap(angle(V_a(:,X/4))),"LineStyle","--","Color",'g')
+ylim([-14*pi,pi])
+%%
+figure
+subplot(2,1,1)
+plot(x,10*log10(abs(V_NR(10,:))),x,10*log10(abs(V_NR(200,:))),...
+    "LineWidth",2)
+hold on
+plot(x,10*log10(abs(V_2Dlw(10,:))),x,10*log10(abs(V_2Dlw(200,:))), ...
+    "LineStyle","--","Color",'k')
+plot(x,10*log10(abs(V_2Dsw(10,:))),x,10*log10(abs(V_2Dsw(200,:))),...
+   "LineStyle","--","Color",'k')
+
+xlabel("x (mm)")
+ylabel("Velocity (unscaled)")
+legend("Apex","Base","Apex LW","Base LW","Apex SW","Base SW",...
+    "location",'sw')
+title("Cochlear Partition Velocity 2-D WKB Model (Newton-Raphson)")
+
+ylim([-70,30])
+
+subplot(2,1,2)
+
+plot(x,unwrap(angle(V_NR(10,:))),x,...
+    unwrap(angle(V_NR(200,:))),"LineWidth",2)
+hold on
+plot(x,unwrap(angle(V_2Dlw(10,:))),x,...
+    unwrap(angle(V_2Dlw(200,:))), "LineStyle","--","Color",'k')
+plot(x,unwrap(angle(V_2Dsw(10,:))),x,...
+    unwrap(angle(V_2Dsw(200,:))),"LineStyle","--","Color",'k')
+ylim([-9*pi,pi])
