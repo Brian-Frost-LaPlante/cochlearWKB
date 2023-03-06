@@ -4,7 +4,7 @@ using Wavelets
 j = im
 
 yFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/ydata.txt"
-zFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/ydata.txt"
+zFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/zdata.txt"
 for a in 1:4
     open("waveletErrors.txt","w") do io
         println(io,"AMPLITUDE "*string(a))

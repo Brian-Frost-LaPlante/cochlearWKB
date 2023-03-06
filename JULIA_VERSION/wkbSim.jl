@@ -5,6 +5,7 @@ using Plots
 using DSP
 using Wavelets
 using Random
+using LinearAlgebra 
 
 j = im # I must use j!
 
@@ -66,11 +67,11 @@ k, P, V = wkbStablePoint(x,omega,Z,rho,h,10,1)
 # using db5 wavelets
 wt = wavelet(WT.db5)
 
+P = 0.10 # percentage of kept terms
+N = Int(floor(P*X))
+
 #v1 = dwt(V[:,1],wt); v2 = dwt(V[:,2],wt)
 #v3 = dwt(V[:,3],wt); v4 = dwt(V[:,4],wt)
-
-#P = 0.10 # percentage of kept terms
-#N = Int(floor(P*X))
 
 #vT1 = threshold(v1, BiggestTH(),N); vT2 = threshold(v2, BiggestTH(),N); 
 #vT3 = threshold(v3, BiggestTH(),N); vT4 = threshold(v4, BiggestTH(),N);
@@ -82,10 +83,3 @@ wt = wavelet(WT.db5)
 #ylims!(1e-1,3e2)
 #title!("Thresholded Responses")
 
-
-P = 0.5 # probability of keeping a point
-mask = rand(Float64,(10,))
-
-mask = mask.<P
-
-mask
