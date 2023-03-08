@@ -9,15 +9,15 @@ using LinearAlgebra
 
 j = im # I must use j!
 
-rho = 1e-6; h = 1; L = 25; # density, height of scalae, length of cochlea
+rho = 1e-6; h = 1; L = 35; # density, height of scalae, length of cochlea
 M0 = 1.5e-6; R0 = 2e-3; S0 = 10e3; # mass, resistance and stiffness at base
 M1 = 0; R1 = 0; S1 = -0.2; # space constants of exponential parameter decay
 
-X = 5000 # number of points in longitudinal linspace
+X = 500 # number of points in longitudinal linspace
 x = LinRange(0,L,X) # longitudinal linspace
 M = M0*exp.(M1*x); R = R0*exp.(R1*x); S = S0*exp.(S1*x); # parameters across x
 
-f = 2000 # frequencies in Hz
+f = [3400] # frequencies in Hz
 omega = 2*pi*f # radian frequencies
 
 Z = (S ./ (j*omega')) .+ R .+ M .* (j*omega') # impedance
@@ -57,7 +57,7 @@ end
 
 k, P, V = wkbStablePoint(x,omega,Z,rho,h,10,1)
 
-P = 0.5 # prob of keeping
+P = .7 # prob of keeping
 
 XX = Int(floor(X*P)) # number of A-Scans to pick out, downsampled in KxM
 
@@ -66,21 +66,23 @@ indsToKeep = sort(randperm(X)[1:XX])
 A = Matrix(1.0I,X,X)
 A = A[indsToKeep,:]
 
+F = svd(A)
+
 xx = A*x
 VV = A*V
 
-# V is the fully sampled vector, VV is the undersampled vector.
+# V is the fully sampled vector in space, VV is the undersampled vector.
+# W is the fully sampled vector in wavelet domain, WW is the undersampled vector in wavelet domain
 # Vp is the guessed vector
-# The undersampling operation A is just indexing by indsToKeep
-# The objective function is (1/2)*||A*V - VV||_2^2 + lambda*||W[VV]||_2
+# Wp is guessed vector in wavelet domain
+# The objective function is (1/2)*||M*Wp - WW||_2^2 + lambda*||Wp||_2
 # Subgradient index i of 2-norm is v_i/||v||_2 if ||v_2 > epsilon, 0 else
 
-Vp = rand(Complex{Float64}, X) 
+Wp = rand(Complex{Float64}, X) 
 
-lambda = 1000.0 
-eta = 0.01
-epsilon = 10
-numSteps  = 1000
+lambda = 5
+L = 1
+numSteps  = 50000
 errors = zeros(numSteps,1)
 
 wt = wavelet(WT.db5)
@@ -88,35 +90,31 @@ wt = wavelet(WT.db5)
 for step = 1:numSteps
     
     global errors
+    global Wp
+    grad1_space = transpose(A)*(A*idwt(Wp[:,1],wt) - VV)
+    grad1 = dwt(grad1_space[:,1],wt)/L
 
-    grad1 = transpose(A)*(A*Vp - VV)
-    norm1 = 0.5*norm(grad1,2)^2 
+    Wp = Wp-grad1
 
-    WW = dwt(Vp,wt)
-    grad2 = zeros(X,1)
-    norm2 = norm(WW,1)
     for i = 1:X
-        if abs(WW[i]) >epsilon
-            grad2[i] = angle(WW[i])
+        if abs(Wp[i]) < lambda/L
+            Wp[i] = 0
         end
     end
-    #norm2 = norm(WW,2)
-    #if norm2 < epsilon
-    #    grad2 = 0
-    #else
-    #    grad2 = WW./norm2
-    #end
 
+    norm1 = 0.5 * norm(A*idwt(Wp[:,1],wt) - VV,2)^2
+    norm2 = norm(Wp,1)
     errors[step] = norm1 + lambda*norm2
-    grad = grad1 .+ lambda.*grad2
-    global Vp = Vp - eta*grad
 end
+
+
+Vp = idwt(Wp[:,1],wt)
 
 p1 = plot(1:numSteps,errors)
 p2 = plot(x,20*log10.(abs.(Vp)),linewidth=5)
 plot!(x,20*log10.(abs.(V)),linewidth = 1)
 
-ylims!(-20,40)
+ylims!(-20,60)
 title!("Thresholded Responses")
 
 plot(p1,p2,layout=(2,1))

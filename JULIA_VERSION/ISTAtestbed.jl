@@ -5,7 +5,7 @@ using Plots
 using DSP
 using Wavelets
 using Random
-using LinearAlgebra 
+using LinearAlgebra
 
 j = im # I must use j!
 
@@ -17,7 +17,7 @@ X = 5000 # number of points in longitudinal linspace
 x = LinRange(0,L,X) # longitudinal linspace
 M = M0*exp.(M1*x); R = R0*exp.(R1*x); S = S0*exp.(S1*x); # parameters across x
 
-f = [800, 1600, 3200,6400] # frequencies in Hz
+f = [6400] # frequencies in Hz
 omega = 2*pi*f # radian frequencies
 
 Z = (S ./ (j*omega')) .+ R .+ M .* (j*omega') # impedance
@@ -32,12 +32,12 @@ function wkbStablePoint(x,omega,Z,rho,h,numSteps,ampOrder)
 
     k = k_LW
 
-    #for step = 1:numSteps
+        #for step = 1:numSteps
     #    alpha = k .*h ./ tanh.(k.*h)
     #    k = k_LW .* sqrt.(alpha)
     #    k = abs.(real(k)) - j*abs.(imag(k))
     #end
-       
+
     k0 = k[1,:]'
 
     int_k = cumsum(k,dims = 1)*L/X
@@ -57,29 +57,68 @@ end
 
 k, P, V = wkbStablePoint(x,omega,Z,rho,h,10,1)
 
-#p1 = plot(x,abs.(V),label = ["800 Hz" "1.6 kHz" "3.2 kHz" "6.4 kHz"])
-#plot!(yscale=:log10)
-#ylims!(1e-1,3e2)
-#p2 = plot(x,unwrap(angle.(V),dims=1)/(2*pi),label = ["800 Hz" "1.6 kHz" "3.2 kHz" "6.4 kHz"])
-#plot(p1,p2,layout=(2,1))
+#P = .9 # prob of keeping
 
+#XX = Int(floor(X*P)) # number of A-Scans to pick out, downsampled in KxM
 
-# using db5 wavelets
+#indsToKeep = sort(randperm(X)[1:XX])
+
+#A = Matrix(1.0I,X,X)
+#A = A[indsToKeep,:]
+
+#xx = A*x
+#VV = A*V
+
+# V is the fully sampled vector in space, VV is the undersampled vector.
+# W is the fully sampled vector in wavelet domain, WW is the undersampled vector in wavelet domain
+# Vp is the guessed vector
+# Wp is guessed vector in wavelet domain
+# The objective function is (1/2)*||M*Wp - WW||_2^2 + lambda*||Wp||_2
+# Subgradient index i of 2-norm is v_i/||v||_2 if ||v_2 > epsilon, 0 else
+
+#Wp = rand(Complex{Float64}, X) 
+
+#lambda = 1
+#eta = 0.01
+#numSteps  = 1
+#errors = zeros(numSteps,1)
+
 wt = wavelet(WT.db5)
 
-P = 0.1 # percentage of kept terms
-N = Int(floor(P*X))
+#for step = 1:numSteps
+#    
+#    global errors
+#    global Wp
+#    grad1 = dwt(transpose(A)*(A*idwt(Wp,wt) - VV), wt)
+#
+#    Wp = Wp-eta*grad1
+#
+#    for i = 1:X
+#        if abs(Wp[i]) > eta*lambda
+#            Wp[i] = abs(Wp[i] - eta*lambda)*exp(j*angle(Wp[i]))
+#        else
+#            Wp[i] = 0
+#        end
+#    end
+#
+#    norm1 = 0.5 * norm(A*idwt(Wp,wt) - VV,2)^2
+#    norm2 = norm(Wp,1)
+#    errors[step] = norm1 + lambda*norm2
+#end
 
-v1 = dwt(V[:,1],wt); v2 = dwt(V[:,2],wt)
-v3 = dwt(V[:,3],wt); v4 = dwt(V[:,4],wt)
 
-vT1 = threshold(v1, BiggestTH(),N); vT2 = threshold(v2, BiggestTH(),N); 
-vT3 = threshold(v3, BiggestTH(),N); vT4 = threshold(v4, BiggestTH(),N);
-
-VT = hcat(idwt(vT1,wt),idwt(vT2,wt),idwt(vT3,wt),idwt(vT4,wt))
-
-plot(x,abs.(VT))
+plot(x,abs.(dwt(V[:,1],wt)))
 plot!(yscale=:log10)
 ylims!(1e-1,3e2)
 title!("Thresholded Responses")
 
+#Vp = idwt(Wp,wt)
+
+#p1 = plot(1:numSteps,errors)
+#p2 = plot(x,20*log10.(abs.(Vp)),linewidth=5)
+#plot!(x,20*log10.(abs.(V)),linewidth = 1)
+
+#ylims!(-20,60)
+#title!("Thresholded Responses")
+
+#plot(p1,p2,layout=(2,1))
