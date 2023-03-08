@@ -33,9 +33,9 @@ A = A[rowsToKeep,:]  # sensing matrix, deletes some A-Scans
 uSlice = A*slice     # this is the measured undersampled image, K x N
 wGuess = zeros(M,N)  # initialized guess in the wavelet domain
 
-lambda = 1 # l1 weight
+lambda = 0.1 # l1 weight
 L = 1 # 1/step size
-numSteps = 100
+numSteps = 10000
 obj = zeros(numSteps,1)
 MSE = zeros(numSteps,1)
 
