@@ -19,7 +19,7 @@ slice[isnan.(slice)] .= 0
 wt = wavelet(WT.db5)
 wSlice = dwt(slice,wt)
 
-P = 0.7
+P = 0.5
 
 M = length(y)
 N = length(z)
@@ -33,9 +33,9 @@ A = A[rowsToKeep,:]  # sensing matrix, deletes some A-Scans
 uSlice = A*slice     # this is the measured undersampled image, K x N
 wGuess = zeros(M,N)  # initialized guess in the wavelet domain
 
-lambda = 0.1 # l1 weight
+lambda = .1 # l1 weight
 L = 1 # 1/step size
-numSteps = 10000
+numSteps = 100000
 obj = zeros(numSteps,1)
 MSE = zeros(numSteps,1)
 
@@ -60,6 +60,12 @@ for step = 1:numSteps
     norm2 = norm(wGuess,1)
     obj[step] = norm1 + lambda*norm2
     MSE[step] = norm(wGuess-wSlice,2)/norm(wSlice,2)
+
+    if (step % 100) == 0 
+        println("STEP " * string(step))
+        println("MSE: " * string(MSE[step]))
+        println("")
+    end
 end
 
 p1 = plot(1:numSteps,obj)
