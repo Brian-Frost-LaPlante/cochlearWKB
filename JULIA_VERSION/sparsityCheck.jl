@@ -10,7 +10,7 @@ for a in 1:4
         println(io,"AMPLITUDE "*string(a))
         close(io)
     end
-    for f in 1:25
+    for f in 14:16
         open("waveletErrors.txt","a") do io
             println(io,"FREQUENCY "*string(f))
             close(io)

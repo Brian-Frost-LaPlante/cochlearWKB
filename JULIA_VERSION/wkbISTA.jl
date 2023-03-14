@@ -13,15 +13,9 @@ rho = 1e-6; h = 1; L = 35; # density, height of scalae, length of cochlea
 M0 = 1.5e-6; R0 = 2e-3; S0 = 10e3; # mass, resistance and stiffness at base
 M1 = 0; R1 = 0; S1 = -0.2; # space constants of exponential parameter decay
 
-X = 500 # number of points in longitudinal linspace
+X = 1000 # number of points in longitudinal linspace
 x = LinRange(0,L,X) # longitudinal linspace
 M = M0*exp.(M1*x); R = R0*exp.(R1*x); S = S0*exp.(S1*x); # parameters across x
-
-f = [3400] # frequencies in Hz
-omega = 2*pi*f # radian frequencies
-
-Z = (S ./ (j*omega')) .+ R .+ M .* (j*omega') # impedance
-Y = 1 ./ Z # admittance
 
 # For this test I decided to use the Alessandro method that I do not particularly like. It's easy!
 function wkbStablePoint(x,omega,Z,rho,h,numSteps,ampOrder)
@@ -54,23 +48,6 @@ function wkbStablePoint(x,omega,Z,rho,h,numSteps,ampOrder)
     return int_k, P, V
 
 end
-
-k, P, V = wkbStablePoint(x,omega,Z,rho,h,10,1)
-
-P = .7 # prob of keeping
-
-XX = Int(floor(X*P)) # number of A-Scans to pick out, downsampled in KxM
-
-indsToKeep = sort(randperm(X)[1:XX])
-
-A = Matrix(1.0I,X,X)
-A = A[indsToKeep,:]
-
-F = svd(A)
-
-xx = A*x
-VV = A*V
-
 # V is the fully sampled vector in space, VV is the undersampled vector.
 # W is the fully sampled vector in wavelet domain, WW is the undersampled vector in wavelet domain
 # Vp is the guessed vector
@@ -78,37 +55,71 @@ VV = A*V
 # The objective function is (1/2)*||M*Wp - WW||_2^2 + lambda*||Wp||_2
 # Subgradient index i of 2-norm is v_i/||v||_2 if ||v_2 > epsilon, 0 else
 
-Wp = rand(Complex{Float64}, X) 
 
-lambda = 5
+lambda = 10
 L = 1
-numSteps  = 50000
+numSteps  = 100000
 errors = zeros(numSteps,1)
 
 wt = wavelet(WT.db5)
 
-for step = 1:numSteps
-    
-    global errors
-    global Wp
-    grad1_space = transpose(A)*(A*idwt(Wp[:,1],wt) - VV)
-    grad1 = dwt(grad1_space[:,1],wt)/L
 
-    Wp = Wp-grad1
+for freq = [300,400,500,600,700,800]
+	println("FREQ: "*string(freq))
+	omega = 2*pi*freq # radian frequencies
 
-    for i = 1:X
-        if abs(Wp[i]) < lambda/L
-            Wp[i] = 0
-        end
-    end
+	Z = (S ./ (j*omega')) .+ R .+ M .* (j*omega') # impedance
+	Y = 1 ./ Z # admittance
 
-    norm1 = 0.5 * norm(A*idwt(Wp[:,1],wt) - VV,2)^2
-    norm2 = norm(Wp,1)
-    errors[step] = norm1 + lambda*norm2
+	k, P, V = wkbStablePoint(x,omega,Z,rho,h,10,1)
+
+	global V
+
+	P = .33 # prob of keeping
+
+	XX = Int(floor(X*P)) # number of A-Scans to pick out, downsampled in KxM
+
+	indsToKeep = sort(randperm(X)[1:XX])
+
+	global A = Matrix(1.0I,X,X)
+	A = A[indsToKeep,:]
+
+
+	global xx = A*x
+	global VV = A*V
+
+	global Wp = rand(Complex{Float64}, X) 
+
+	global VW = dwt(V[:,1],wt,3)
+
+	for step = 1:numSteps
+	    grad1_space = transpose(A)*(A*idwt(Wp[:,1],wt,3) - VV)
+	    grad1 = dwt(grad1_space[:,1],wt,3)/L
+
+	    Wp = Wp-grad1
+
+	    for i = 125:X
+		if abs(Wp[i]) < lambda/L
+		    Wp[i] = 0
+		end
+	    end
+
+	    norm1 = 0.5 * norm(A*idwt(Wp[:,1],wt,3) - VV,2)^2
+	    norm2 = norm(Wp,1)
+	    
+	    
+	    #errors[step] = norm1 + lambda*norm2
+
+	    errors[step] = norm(VW-Wp,2)/norm(VW,2)
+
+	    if step%10000==0
+		println(string(errors[step]))
+	    end
+
+	end
 end
 
-
-Vp = idwt(Wp[:,1],wt)
+Vp = idwt(Wp[:,1],wt,3)
 
 p1 = plot(1:numSteps,errors)
 p2 = plot(x,20*log10.(abs.(Vp)),linewidth=5)
