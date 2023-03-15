@@ -1,13 +1,13 @@
 using DelimitedFiles, Plots, Images, ImageView
 using DSP, Wavelets, Random, LinearAlgebra
 
-logfile = "ArealLogs_P25l5L1.txt"
+logfile = "ArealLogs_P25l5L1_65.txt"
 fp = open(logfile,"w")
 
 j = im
 
-yFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/ydata.txt"
-zFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/zdata.txt"
+yFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 65/ydata.txt"
+zFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 65/zdata.txt"
 
 # for now I only care about one frequency and one amplitude
 
@@ -16,8 +16,8 @@ for ff = 10:3:25
 println("FREQ "*string(ff)*"\n")
 write(fp,"FREQ "*string(ff)*"\n")
 
-sliceFileR = "/home/brian/cochlearWKB/interpolatedAreaCSVs/amp4/freq"*string(ff)*"/mapReal.txt"
-sliceFileI = "/home/brian/cochlearWKB/interpolatedAreaCSVs/amp4/freq"*string(ff)*"/mapImag.txt"
+sliceFileR = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 65/amp4/freq"*string(ff)*"/mapReal.txt"
+sliceFileI = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 65/amp4/freq"*string(ff)*"/mapImag.txt"
 y = readdlm(yFile,',',Float32)
 z = readdlm(zFile,',',Float32)
 
