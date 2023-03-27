@@ -1,27 +1,27 @@
 using DelimitedFiles, Plots, Images, ImageView
 using DSP, Wavelets, Random, LinearAlgebra
 
-lambda = 5e4 # l1 weight
-L = 2 # 1/step size
+lambda = 5e3 # l1 weight
+L = 0.5 # 1/step size
 numSteps = 10000
 
-logfile = "ArealLogs_A4P20l5e4_65.txt"
+logfile = "ArealLogs_A3P20l5e3_54.txt"
 fp = open(logfile,"w")
 
 j = im
 
-yFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 65/ydata.txt"
-zFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 65/zdata.txt"
+yFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 54/ydata.txt"
+zFile = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 54/zdata.txt"
 
 # for now I only care about one frequency and one amplitude
 
-for ff = 10:5:25 
+for ff = 5:5:25 
 
 println("FREQ "*string(ff)*"\n")
 write(fp,"FREQ "*string(ff)*"\n")
 
-global sliceFileR = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 65/amp4/freq"*string(ff)*"/mapReal.txt"
-global sliceFileI = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 65/amp4/freq"*string(ff)*"/mapImag.txt"
+global sliceFileR = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 54/amp3/freq"*string(ff)*"/mapReal.txt"
+global sliceFileI = "/home/brian/cochlearWKB/interpolatedAreaCSVs/angle 54/amp3/freq"*string(ff)*"/mapImag.txt"
 y = readdlm(yFile,',',Float32)
 z = readdlm(zFile,',',Float32)
 
@@ -69,7 +69,7 @@ for step = 1:numSteps
                     if abs(wGuess[n,m]) < lambda/L
                         wGuess[n,m] = 0
                     else
-                        wGuess[n,m] = angle(wGuess[n,m])*(abs(wGuess[n,m]) - lambda/L)
+                        wGuess[n,m] = sign(wGuess[n,m])*(abs(wGuess[n,m]) - lambda/L)
                     end
             end
             end
