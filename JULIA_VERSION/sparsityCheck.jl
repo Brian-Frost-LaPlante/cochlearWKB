@@ -81,7 +81,7 @@ for a in 1:4
 
             keepSearching = true
 
-            P = 0.001
+            P = 0.0001
             while keepSearching
 
                 open(saveFile,"a") do io
@@ -107,10 +107,10 @@ for a in 1:4
                 end
                    
                 println("ERROR: "*string(nError))
-                if nError < 5
+                if nError < 1
                     keepSearching = false
                 else
-                    P = P + 0.01
+                    P = P + 0.0001
                 end
             end
         end
